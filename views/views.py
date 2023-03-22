@@ -115,29 +115,30 @@ def UploadGet():
 #Upload Post
 @app.route('/upload', methods=['POST'])
 def UploadPost():
-    print('!!')
-    if 'file' not in request.files:
-        flash('No file part')
-        return redirect(request.url)
+    batch = 'batch2'
+    pcb_defect(batch)
+    # if 'file' not in request.files:
+    #     flash('No file part')
+    #     return redirect(request.url)
 
-    file = request.files['file']
-    if file.filename == '' :
-        flash('No image selected for uploading')
-        return redirect(request.url)
+    # file = request.files['file']
+    # if file.filename == '' :
+    #     flash('No image selected for uploading')
+    #     return redirect(request.url)
 
-    if file and allowed_file(file.filename):
-        erase_dir()
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename)) 
-        imgName = file_saver(file.filename, request.form["Id"])
+    # if file and allowed_file(file.filename):
+    #     erase_dir()
+    #     file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename)) 
+    #     imgName = file_saver(file.filename, request.form["Id"])
 
-        make_augumentation(imgName,request.form["Id"])
-        detectDefect(imgName,request.form["Id"])
+    #     make_augumentation(imgName,request.form["Id"])
+    #     detectDefect(imgName,request.form["Id"])
         
-    else:
-        flash('Allowed image types are -> png, jpg, jpeg, bmp')
-        return redirect(request.url)
+    # else:
+    #     flash('Allowed image types are -> png, jpg, jpeg, bmp')
+    #     return redirect(request.url)
         
-    return redirect(f'/result/{request.form["Id"]}')
+    return redirect(f'/result/{batch}')
 
 #Upload Get
 @app.route('/result/<id>', methods=['GET'])

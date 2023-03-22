@@ -8,69 +8,35 @@ from PIL import Image, ImageOps
 from efficientnet.tfkeras import EfficientNetB4
 import cv2
 
-SIZE = 256
+import torch
+import glob
 
-def detectDefect(imagePath,id):
-    model = tf.keras.models.load_model(f"models\WeldDetectorModel.h5", compile=False)
-
-    X = np.zeros((1, SIZE, SIZE, 1))
-    image = Image.open(imagePath)
-    image = np.array(image.resize((SIZE, SIZE)))
-    image = image.reshape((SIZE, SIZE, 1))
-    X[0,] = np.array(image) / 255.
-    pred = model.predict(X) 
-
-    plt.axis('off')
-    plt.imshow(image, cmap='gray')
-    plt.imshow(pred[0].reshape(SIZE,SIZE), cmap='coolwarm', alpha=0.4)
-    plt.savefig(f"static/uploads/{id}/mask.png", bbox_inches='tight', pad_inches=0)
-
-#----------Augumenttaion-------------#
-def zoom_center(img, zoom_factor=1.5):
-    y_size = img.shape[0]
-    x_size = img.shape[1]
-    x1 = int(0.5*x_size*(1-1/zoom_factor))
-    x2 = int(x_size-0.5*x_size*(1-1/zoom_factor))
-    y1 = int(0.5*y_size*(1-1/zoom_factor))
-    y2 = int(y_size-0.5*y_size*(1-1/zoom_factor))
-    img_cropped = img[y1:y2,x1:x2]
-    return cv2.resize(img_cropped, None, fx=zoom_factor, fy=zoom_factor)
+def obj_detector_yolov7(img_path):
+    model = torch.hub.load('yolov7', 'custom', 'yolov7/pcb_defect_detection/Detection_Ver3/weights/best.pt', source='local', force_reload=True)
+    model.names = ["missing_hole", "mouse_bite", "open_circuit", "short", "spurious_copper", "spur"]
+    img = cv2.imread(img_path) 
+    results = model(img, size=608)
+    results.save()
+    result_pd = results.pandas().xyxy[0]
+    boxes = [result_pd['xmin'].astype(np.int32).tolist(),result_pd['ymin'].astype(np.int32).tolist(),result_pd['xmax'].astype(np.int32).tolist(),result_pd['ymax'].astype(np.int32).tolist()]
     
-def zoom_img(image_path,patient_id):
-    img = cv2.imread(image_path)
-    img_zoomed_and_cropped = zoom_center(img)
-    cv2.imwrite(f'static/uploads/{patient_id}/zoom_crop.png', img_zoomed_and_cropped)
+    return result_pd['name'], boxes, img
 
-def rotate(image_path,patient_id):
-    img = cv2.imread(image_path)
-    img_90 = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
-    img_180 = cv2.rotate(img_90, cv2.ROTATE_90_CLOCKWISE)
-    cv2.imwrite(f'static/uploads/{patient_id}/rotate_90.png', img_90)
-    cv2.imwrite(f'static/uploads/{patient_id}/rotate_180.png', img_180)
+def pcb_defect(batch):
+    # print(f"dataset/{batch}/*.jpg")
+    # board = glob.glob(f"../dataset/{batch}/*.jpg")
+    board = [f'dataset/{batch}/1 (1).jpg', f'dataset/{batch}/1 (2).jpg', f'dataset/{batch}/1 (3).jpg', f'dataset/{batch}/1 (4).jpg', f'dataset/{batch}/1 (5).jpg',
+             f'dataset/{batch}/1 (6).jpg', f'dataset/{batch}/1 (7).jpg', f'dataset/{batch}/1 (8).jpg', f'dataset/{batch}/1 (9).jpg', f'dataset/{batch}/1 (10).jpg']
+    
+    i = 1
+    for images in board:
+        plt.figure(figsize=(20,120))
 
-def increase_brightness(image_path,id):
-    img = cv2.imread(image_path)
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    h, s, v = cv2.split(hsv)
-    v += 255
-    final_hsv = cv2.merge((h, s, v))
-    img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
-    cv2.imwrite(f'static/uploads/{id}/brightness.png', img)
+        # YoloV7 Inference
+        plt.subplot(10,2,1)
+        names,boxes,sample = obj_detector_yolov7(images)  
 
-def color_spaces(image_path, id):
-    img = cv2.imread(image_path)
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    YCrCb = cv2.cvtColor(img, cv2.COLOR_BGR2YCR_CB)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    cv2.imwrite(f'static/uploads/{id}/hsv.png', hsv)
-    cv2.imwrite(f'static/uploads/{id}/YCrCb.png', YCrCb)
-    cv2.imwrite(f'static/uploads/{id}/gray.png', gray)
-    cv2.imwrite(f'static/uploads/{id}/rgb.png', rgb)
-
-
-def make_augumentation(image_path,id):
-    zoom_img(image_path,id)
-    rotate(image_path,id)
-    increase_brightness(image_path,id)
-    color_spaces(image_path,id)
+        plt.axis('off')
+        plt.imshow(sample)
+        plt.savefig(f"static/uploads/{batch}/{i}.png", bbox_inches='tight', pad_inches=0)
+        i+=1
